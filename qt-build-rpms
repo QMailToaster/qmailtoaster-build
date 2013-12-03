@@ -54,9 +54,15 @@ b55_check_package(){
 grepstring=${grepstring%</a>*}
 srcname=${grepstring#*src.rpm\">}
 pkgverrel=${srcname%.src.rpm}
+release=${pkgverrel##*-}
+pkg=${pkgverrel%-$release}
+version=${pkg##*-}
+pkg=${pkg%-$version}
 
-if [ -z "$(grep $pkgverrel $temparch)" ] \
-      && [ -z "$(grep $pkgverrel $tempnodi)" ]; then
+# we look for anything between package and version
+# because libdomainkeys src.rpm creates only libdomainkeys-devel binary.
+if    [ -z "$(grep $pkg.*-$version-$release $temparch)" ] && \
+      [ -z "$(grep $pkg.*-$version-$release $tempnodi)" ]; then
   c555_build_package
 fi
 }
@@ -99,6 +105,11 @@ rpmbuild -bs --define "dist $repo" $specdir/$pkg.spec
 d5554_build_signed_rpms
 
 d5557_upload_resulting_rpms
+
+if [ -f $logfile ]; then
+  :
+# TODO: post log file to github
+fi
 }
 
 ######################################################################
@@ -131,6 +142,11 @@ expect -c "
 d5557_upload_resulting_rpms(){
 
 while read wrotestring; do
+# for some reason this loop executes once when there's nothing read
+  if [ -z "$wrotestring" ]; then
+    echo "$me - build appears to have failed - exiting"
+    exit 1
+  fi
   rpmfile=${wrotestring#Wrote: }
 # there's a \r at the end of this string that we need to get rid of
   rpmfile=${rpmfile%.rpm*}
@@ -142,11 +158,6 @@ while read wrotestring; do
 done << !EOF!
 $(grep ^Wrote $logfile)
 !EOF!
-
-if [ -f $logfile ]; then
-  :
-# TODO: post log file to github
-fi
 }
 
 ######################################################################
