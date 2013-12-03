@@ -1,0 +1,166 @@
+#!/bin/bash
+# Copyright (C) 2013 Eric Shubert <eric@datamatters.us>
+#
+# Build QMailToaster binary rpm file
+
+######################################################################
+# Change Log
+# 12/02/13 shubes - created
+######################################################################
+
+# change my* variables appropriately. Nothing else should be changed.
+mygpgpass="use your gpg key pass"
+myrepouser=shubes-stage
+
+######################################################################
+# set temp names for rpm indexes
+#
+a1_setup_temp_stuff(){
+
+temparch=$(tempfile 2>/dev/null) || temparch=/tmp/$me.$$
+tempnodi=$(tempfile 2>/dev/null) || tempnodi=/tmp/$me.$$.2
+
+# make sure the temp stuff is deleted when we're done
+trap "rm -f $temparch $tempnodi" 0 1 2 5 15
+}
+
+######################################################################
+# process each status
+# get index of binary files in temparch and nodist rpms in tempnodi,
+# then process each src.rpm file
+#
+a5_each_status(){
+
+statdistverarch=$status/$DISTRO/${OSVER%%.*}/$arch
+repostage=/stage/$statdistverarch
+
+wget -O $temparch $webmirror/$statdistverarch/
+wget -O $tempnodi $webmirror/$status/nodist/
+
+while read grepstring; do
+  if [ ! -z "$grepstring" ]; then
+    b55_check_package
+  fi
+done << !EOF!
+$(wget -O - $webmirror/$status/SRPMS/ | grep \.src\.rpm\<)
+!EOF!
+}
+
+######################################################################
+# check to see if the package needs to be built
+#
+b55_check_package(){
+
+grepstring=${grepstring%</a>*}
+srcname=${grepstring#*src.rpm\">}
+pkgverrel=${srcname%.src.rpm}
+
+if [ -z "$(grep $pkgverrel $temparch)" ] \
+      && [ -z "$(grep $pkgverrel $tempnodi)" ]; then
+  c555_build_package
+fi
+}
+
+######################################################################
+# process each package
+#
+c555_build_package(){
+
+echo "$me - processing $srcname"
+
+srpmfile=$srcrpmdir/$srcname
+wget -O $srpmfile $webmirror/$status/SRPMS/$srcname
+
+rpm --checksig $srpmfile
+if [ "$?" != "0" ]; then
+  echo "$me -- $srcname in $status failed signature check"
+# exit 1
+fi
+
+# we need to rebuild the src.rpm first,
+# to use the --nomd5 flag for backward (COS5) compatibility
+rpm -ivh --nomd5 $srpmfile
+rm -f $srpmfile
+
+release=${pkgverrel##*-}
+pkg=${pkgverrel%-$release}
+version=${pkg##*-}
+pkg=${pkg%-$version}
+
+rpmbuild -bs --define "dist $repo" $specdir/$pkg.spec
+
+d5554_build_signed_rpms
+
+d5557_upload_resulting_rpms
+}
+
+######################################################################
+# invoke expect build and sign src.rpm with no prompt
+#
+d5554_build_signed_rpms(){
+
+if [ "$pkg" == dovecot ] && [ "$arch" == x86_64 ]; then
+  qa_rpaths="QA_RPATHS=$[ 0x0001|0x0010 ]"
+else
+  qa_rpaths=""
+fi
+
+logfile=$logdir/$pkgverrel$dist.$arch.log
+rm -f $logfile
+
+expect -c "
+  set timeout -1
+  log_file $logfile
+  spawn $qa_rpaths rpmbuild --rebuild --define \"dist $repo$dist\" --sign $srpmfile
+  expect {
+    phrase:  { send \"$mygpgpass\r\"; exp_continue }
+  }
+"
+}
+
+######################################################################
+# upload the binary rpm(s) to staging
+#
+d5557_upload_resulting_rpms(){
+
+while read wrotestring; do
+  rpmfile=${wrotestring#Wrote: }
+# there's a \r at the end of this string that we need to get rid of
+  rpmfile=${rpmfile%.rpm*}
+  rpmfile=${rpmfile}.rpm
+  if [ ! -z "$rpmfile" ]; then
+    scp -p -P 17132 $rpmfile $myrepouser@$repohost:$repostage/.
+    rm $rpmfile
+  fi
+done << !EOF!
+$(grep ^Wrote $logfile)
+!EOF!
+
+if [ -f $logfile ]; then
+  :
+# TODO: post log file to github
+fi
+}
+
+######################################################################
+# main routine begins here
+#
+me=${0##*/}
+myver=v1.0
+
+webmirror=http://mirror1.qmailtoaster.com
+repo=".qt"
+repohost=masterepo.qmailtoaster.com
+srcrpmdir="$(rpm --eval='%{_srcrpmdir}')"
+specdir="$(rpm --eval='%{_specdir}')"
+dist="$(rpm --eval='%{dist}')"
+arch=$(rpm --eval='%{_arch}')
+logdir="$(rpm --eval='%{_topdir}')/BUILDLOGS"
+mkdir -p $logdir
+. qmt-whatami -s
+
+a1_setup_temp_stuff
+
+for status in devel testing; do
+  a5_each_status
+done
