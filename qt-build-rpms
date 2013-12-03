@@ -79,6 +79,7 @@ fi
 
 # we need to rebuild the src.rpm first,
 # to use the --nomd5 flag for backward (COS5) compatibility
+# TODO: if we're not COS5, don't do this
 rpm -ivh --nomd5 $srpmfile
 rm -f $srpmfile
 
@@ -88,6 +89,12 @@ version=${pkg##*-}
 pkg=${pkg%-$version}
 
 rpmbuild -bs --define "dist $repo" $specdir/$pkg.spec
+
+# TODO: set up sudo so a password isn't required?
+# or perhaps create a script run as root which downloads all the packages
+# and then runs yum-builddep on each one. Probably a better idea.
+# could be done in %post of qmailtoaster-build package.
+#sudo yum-builddep
 
 d5554_build_signed_rpms
 
