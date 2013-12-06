@@ -61,8 +61,16 @@ pkg=${pkg%-$version}
 
 # we look for anything between package and version
 # because libdomainkeys src.rpm creates only libdomainkeys-devel binary.
-if    [ -z "$(grep $pkg.*-$version-$release $temparch)" ] && \
+# we don't do this for other pkgs because of qmailadmin and qmailadmin-spambox,
+# which are separate packages.
+
+if    [ "$pkg" == "libdomainkeys" ] && \
+      [ -z "$(grep $pkg.*-$version-$release $temparch)" ] && \
       [ -z "$(grep $pkg.*-$version-$release $tempnodi)" ]; then
+  c555_build_package
+elif  [ "$pkg" != "libdomainkeys" ] && \
+      [ -z "$(grep $pkg-$version-$release $temparch)" ] && \
+      [ -z "$(grep $pkg-$version-$release $tempnodi)" ]; then
   c555_build_package
 fi
 }
@@ -117,13 +125,19 @@ fi
 #
 d5554_build_signed_rpms(){
 
+if [ "$pkg" == dovecot ] && [ "$arch" == x86_64 ]; then
+  qa_rpaths="QA_RPATHS=$[ 0x0001|0x0010 ]"
+else
+  qa_rpaths=""
+fi
+
 logfile=$logdir/$pkgverrel$dist.$arch.log
 rm -f $logfile
 
 expect -c "
   set timeout -1
   log_file $logfile
-  spawn rpmbuild --rebuild --define \"dist $repo$dist\" --sign $srpmfile
+  spawn $qa_rpaths rpmbuild --rebuild --define \"dist $repo$dist\" --sign $srpmfile
   expect {
     phrase:  { send \"$mygpgpass\r\"; exp_continue }
   }
@@ -138,8 +152,8 @@ d5557_upload_resulting_rpms(){
 while read wrotestring; do
 # for some reason this loop executes once when there's nothing read
   if [ -z "$wrotestring" ]; then
-    echo "$me - build appears to have failed"
-    break
+    echo "$me - build appears to have failed - exiting"
+    exit 1
   fi
   rpmfile=${wrotestring#Wrote: }
 # there's a \r at the end of this string that we need to get rid of
