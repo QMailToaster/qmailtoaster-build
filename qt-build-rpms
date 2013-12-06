@@ -125,19 +125,13 @@ fi
 #
 d5554_build_signed_rpms(){
 
-if [ "$pkg" == dovecot ] && [ "$arch" == x86_64 ]; then
-  qa_rpaths="QA_RPATHS=$[ 0x0001|0x0010 ]"
-else
-  qa_rpaths=""
-fi
-
 logfile=$logdir/$pkgverrel$dist.$arch.log
 rm -f $logfile
 
 expect -c "
   set timeout -1
   log_file $logfile
-  spawn $qa_rpaths rpmbuild --rebuild --define \"dist $repo$dist\" --sign $srpmfile
+  spawn rpmbuild --rebuild --define \"dist $repo$dist\" --sign $srpmfile
   expect {
     phrase:  { send \"$mygpgpass\r\"; exp_continue }
   }
