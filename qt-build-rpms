@@ -18,31 +18,30 @@ myrepouser=shubes-stage
 a1_setup_temp_stuff(){
 
 temparch=$(tempfile 2>/dev/null) || temparch=/tmp/$me.$$
-tempnodi=$(tempfile 2>/dev/null) || tempnodi=/tmp/$me.$$.2
 
 # make sure the temp stuff is deleted when we're done
-trap "rm -f $temparch $tempnodi" 0 1 2 5 15
+trap "rm -f $temparch" 0 1 2 5 15
 }
 
 ######################################################################
 # process each status
-# get index of binary files in temparch and nodist rpms in tempnodi,
-# then process each src.rpm file
+# get index of binary files in temparch, then process each src.rpm file
 #
 a5_each_status(){
+
+echo "$me - checking $status ..."
 
 statdistverarch=$status/$DISTRO/${OSVER%%.*}/$arch
 repostage=/stage/$statdistverarch
 
-wget -O $temparch $webmirror/$statdistverarch/
-wget -O $tempnodi $webmirror/$status/nodist/
+wget -O $temparch $webmirror/$statdistverarch/ 2>/dev/null
 
 while read grepstring; do
   if [ ! -z "$grepstring" ]; then
     b55_check_package
   fi
 done << !EOF!
-$(wget -O - $webmirror/$status/SRPMS/ | grep \.src\.rpm\<)
+$(wget -O - $webmirror/$status/SRPMS/ 2>/dev/null | grep \.src\.rpm\<)
 !EOF!
 }
 
@@ -59,18 +58,24 @@ pkg=${pkgverrel%-$release}
 version=${pkg##*-}
 pkg=${pkg%-$version}
 
+echo "$me - checking $pkg ..."
+
+# look for "BuildArch: noarch" tag in spec, and bypass if it's there
+wget -O - --no-check-certificate https://raw.github.com/QMailToaster/$pkg/master/$pkg.spec 2>/dev/null | grep -m 1 ^BuildArch | grep -q noarch
+if [ $? -eq 0 ]; then
+  return
+fi
+
 # we look for anything between package and version
 # because libdomainkeys src.rpm creates only libdomainkeys-devel binary.
 # we don't do this for other pkgs because of qmailadmin and qmailadmin-spambox,
 # which are separate packages.
 
 if    [ "$pkg" == "libdomainkeys" ] && \
-      [ -z "$(grep $pkg.*-$version-$release $temparch)" ] && \
-      [ -z "$(grep $pkg.*-$version-$release $tempnodi)" ]; then
+      [ -z "$(grep $pkg.*-$version-$release $temparch)" ]; then
   c555_build_package
 elif  [ "$pkg" != "libdomainkeys" ] && \
-      [ -z "$(grep $pkg-$version-$release $temparch)" ] && \
-      [ -z "$(grep $pkg-$version-$release $tempnodi)" ]; then
+      [ -z "$(grep $pkg-$version-$release $temparch)" ]; then
   c555_build_package
 fi
 }
@@ -125,13 +130,19 @@ fi
 #
 d5554_build_signed_rpms(){
 
+if [ "$pkg" == dovecot ] && [ "$arch" == x86_64 ]; then
+  qa_rpaths="QA_RPATHS=$[ 0x0001|0x0010 ]"
+else
+  qa_rpaths=""
+fi
+
 logfile=$logdir/$pkgverrel$dist.$arch.log
 rm -f $logfile
 
 expect -c "
   set timeout -1
   log_file $logfile
-  spawn rpmbuild --rebuild --define \"dist $repo$dist\" --sign $srpmfile
+  spawn $qa_rpaths rpmbuild --rebuild --define \"dist $repo$dist\" --sign $srpmfile
   expect {
     phrase:  { send \"$mygpgpass\r\"; exp_continue }
   }
@@ -184,3 +195,5 @@ a1_setup_temp_stuff
 for status in devel testing; do
   a5_each_status
 done
+
+echo "$me - done"
