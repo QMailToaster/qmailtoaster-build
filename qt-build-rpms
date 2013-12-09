@@ -93,7 +93,7 @@ wget -O $srpmfile $webmirror/$status/SRPMS/$srcname
 rpm --checksig $srpmfile
 if [ "$?" != "0" ]; then
   echo "$me -- $srcname in $status failed signature check"
-# exit 1
+  exit 1
 fi
 
 # we need to rebuild the src.rpm first,
