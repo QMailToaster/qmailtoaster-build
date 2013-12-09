@@ -72,10 +72,10 @@ fi
 # which are separate packages.
 
 if    [ "$pkg" == "libdomainkeys" ] && \
-      [ -z "$(grep $pkg.*-$version-$release $temparch)" ]; then
+      [ -z "$(grep $pkg.*-$version-$release.*\.rpm $temparch)" ]; then
   c555_build_package
 elif  [ "$pkg" != "libdomainkeys" ] && \
-      [ -z "$(grep $pkg-$version-$release $temparch)" ]; then
+      [ -z "$(grep $pkg-$version-$release.*\.rpm $temparch)" ]; then
   c555_build_package
 fi
 }
