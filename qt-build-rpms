@@ -112,7 +112,7 @@ rpmbuild -bs --define "dist $repo" $specdir/$pkg.spec
 # TODO: set up sudo so a password isn't required?
 # or perhaps create a script run as root which downloads all the packages
 # and then runs yum-builddep on each one. Probably a better idea.
-# could be done in %post of qmailtoaster-build package.
+# could *not* be done in %post of qmailtoaster-build package (recursive yum).
 #sudo yum-builddep
 
 d5554_build_signed_rpms
@@ -120,8 +120,8 @@ d5554_build_signed_rpms
 d5557_upload_resulting_rpms
 
 if [ -f $logfile ]; then
-  :
-# TODO: post log file to github
+  scp -p -P 17132 $logfile $myrepouser@$repohost:$repostage/.
+  rm $logfile
 fi
 }
 
