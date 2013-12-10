@@ -130,7 +130,7 @@ fi
 #
 d5554_build_signed_rpms(){
 
-logfile=$logdir/$pkgverrel$dist.$arch.buildlog
+logfile=$logdir/$pkgverrel$dist.$arch.buildlog.txt
 rm -f $logfile
 
 expect -c "
