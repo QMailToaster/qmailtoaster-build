@@ -120,6 +120,7 @@ d5554_build_signed_rpms
 d5557_upload_resulting_rpms
 
 if [ -f $logfile ]; then
+  chmod -x $logfile
   scp -p -P 17132 $logfile $myrepouser@$repohost:$repostage/.
   rm $logfile
 fi
