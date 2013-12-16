@@ -67,15 +67,21 @@ if [ $? -eq 0 ]; then
 fi
 
 # we look for anything between package and version
-# because libdomainkeys src.rpm creates only libdomainkeys-devel binary.
+# because libdomainkeys and libvpopmail only create -devel binary.
 # we don't do this for other pkgs because of qmailadmin and qmailadmin-spambox,
 # which are separate packages.
+# This is a bit of a hack, and could be done more generically.
 
-if    [ "$pkg" == "libdomainkeys" ] && \
-      [ -z "$(grep $pkg.*-$version-$release.*\.rpm $temparch)" ]; then
-  c555_build_package
-elif  [ "$pkg" != "libdomainkeys" ] && \
-      [ -z "$(grep $pkg-$version-$release.*\.rpm $temparch)" ]; then
+case "$pkg" in
+  libdomainkeys | libvpopmail )
+    grepfor="$pkg.*-$version-$release.*\.rpm"
+    ;;
+  * )
+    grepfor="$pkg-$version-$release.*\.rpm"
+    ;;
+esac
+
+if [ -z "$(grep $grepfor $temparch)" ]; then
   c555_build_package
 fi
 }
@@ -88,6 +94,7 @@ c555_build_package(){
 echo "$me - processing $srcname"
 
 srpmfile=$srcrpmdir/$srcname
+rm -f $srpmfile
 wget -O $srpmfile $webmirror/$status/SRPMS/$srcname
 
 rpm --checksig $srpmfile
