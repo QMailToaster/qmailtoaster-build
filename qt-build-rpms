@@ -58,7 +58,7 @@ pkg=${pkgverrel%-$release}
 version=${pkg##*-}
 pkg=${pkg%-$version}
 
-echo "$me - checking $pkg ..."
+echo "$me - checking $pkgverrel ..."
 
 # look for "BuildArch: noarch" tag in spec, and bypass if it's there
 wget -O - --no-check-certificate https://raw.github.com/QMailToaster/$pkg/master/$pkg.spec 2>/dev/null | grep -m 1 ^BuildArch | grep -q noarch
